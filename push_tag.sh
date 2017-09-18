@@ -16,7 +16,7 @@ fi
 push_tag $1
 if [ "$?" -eq 0 ]; then
     echo
-    echo "Tagged images pushed successfull"
+    echo "Tagged images pushed successfully"
 else
     echo
     echo "Failed to push tagged images"
