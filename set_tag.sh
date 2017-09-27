@@ -1,6 +1,7 @@
 #!/bin/bash
 if [ "$#" -ne 2 ]; then
     echo "Usage: set_tag.sh VERSION TAG"
+    echo Pull radanalyticsio s2i and oshinko images from docker.io with the tag VERSION, and apply a new tag TAG
     exit -1
 fi
 
