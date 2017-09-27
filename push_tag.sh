@@ -10,6 +10,7 @@ function push_tag() {
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: push_tag.sh TAG"
+    echo Push local radanalyticsio s2i and oshinko images tagged with TAG to docker.io
     exit 1
 fi
 

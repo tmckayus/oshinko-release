@@ -1,0 +1,139 @@
+#!/bin/bash
+
+S2I_TEST_IMAGE_PYSPARK=${S2I_TEST_IMAGE_PYSPARK:-radanalytics-pyspark}
+S2I_TEST_IMAGE_JAVA=${S2I_TEST_IMAGE_JAVA:-radanalytics-java-spark}
+S2I_TEST_IMAGE_SCALA=${S2I_TEST_IMAGE_SCALA:-radanalytics-scala-spark}
+S2I_TEST_SPARK_IMAGE=${S2I_TEST_SPARK_IMAGE:-radanalyticsio/openshift-spark:2.2-latest}
+S2I_TEST_STABLE=${S2I_TEST_STABLE:-false}
+
+if [ -z $S2I_TEST_OSHINKO_VERSION ]; then
+    echo "******* You must set S2I_TEST_OSHINKO_VERSION to the version you are testing for *******"
+    exit -1
+fi
+
+PROJECT=$(oc project -q)
+MY_SCRIPT=`basename "$0"`
+
+# We count on this file being somewhere below oshinko-release, and
+# the location of hack/lib under oshinko-relese
+source $(readlink -f `dirname "${BASH_SOURCE[0]}"` | grep -o '.*/oshinko-release')/hack/lib/init.sh
+
+function print_test_env {
+    echo Using s2i pyspark image $S2I_TEST_IMAGE_PYSPARK
+    echo Using s2i java image $S2I_TEST_IMAGE_JAVA
+    echo Using s2i scala image $S2I_TEST_IMAGE_SCALA
+    echo Using spark image $S2I_TEST_SPARK_IMAGE
+    echo Using oshinko version $S2I_TEST_OSHINKO_VERSION
+}
+
+function set_defaults() {
+    DEL_CLUSTER=true
+    GEN_CLUSTER_NAME=
+    APP_NAME=    
+}
+
+function app_preamble() {
+    set +e
+    SUFFIX=$(date -Ins | md5sum | tr -dc 'a-z0-9' | fold -w 4 | head -n 1)
+    set -e
+    APP_NAME=app-$SUFFIX
+    GEN_CLUSTER_NAME=cl-$SUFFIX
+    MASTER_DC=$GEN_CLUSTER_NAME-m
+    WORKER_DC=$GEN_CLUSTER_NAME-w
+}
+
+function set_template() {
+    TEMPLATE=$1
+}
+
+function set_git_uri() {
+    if [ "$#" -eq 1 ]; then
+	GIT_URI=$1
+	SOURCE_INFO="-p GIT_URI=$1" 
+    elif [ "$#" -eq 2 ]; then
+	GIT_URI=$1
+	SOURCE_INFO="-p GIT_URI=$1 -p GIT_REF=$2"
+    else
+	GIT_URI=
+	SOURCE_INFO=
+    fi
+}
+
+APP_MAIN_CLASS=
+function set_app_main_class() {
+    if [ "$#" -eq 1 ]; then
+	APP_MAIN_CLASS="-p APP_MAIN_CLASS=$1"
+    else
+	APP_MAIN_CLASS=
+    fi
+}
+
+function run_app() {
+    app_preamble
+    set +e
+    # If is a build is necessary, it can take a long time and this can cause tests in
+    # environments like travis to time out from lack of output.  So if the imagestream
+    # associated with APP_NAME doesn't already exist, watch the build log to produce log
+    # output and prevent timeout.
+    oc get is $APP_NAME &> /dev/null
+    local stream_exists=$?
+    oc new-app --template=$TEMPLATE $SOURCE_INFO -p APPLICATION_NAME=$APP_NAME -p OSHINKO_DEL_CLUSTER=$DEL_CLUSTER -p OSHINKO_CLUSTER_NAME=$GEN_CLUSTER_NAME $APP_MAIN_CLASS
+}
+
+function test_versions {
+    set_defaults
+    local image=$1
+    run_app
+    if [ "$S2I_TEST_STABLE" == true ]; then
+	os::cmd::try_until_success 'oc log buildconfig/$APP_NAME | grep "$image":stable'	
+    else
+	os::cmd::try_until_success 'oc log buildconfig/$APP_NAME | grep "$image":"$S2I_TEST_OSHINKO_VERSION"'
+    fi
+    os::cmd::try_until_text    'oc logs dc/"$APP_NAME"' 'Using.*cluster' $((10*minute))
+    os::cmd::try_until_success 'oc log dc/$APP_NAME | grep oshinko\ "$S2I_TEST_OSHINKO_VERSION"'
+    os::cmd::try_until_success 'oc log dc/$APP_NAME | grep Default\ spark\ image:\ "$S2I_TEST_SPARK_IMAGE"'
+    os::cmd::try_until_text    'oc log dc/$APP_NAME' 'Running Spark'
+    os::cmd::try_until_text    'oc log dc/$APP_NAME' 'Job.*finished'
+    os::cmd::try_until_text    'oc log dc/$APP_NAME' 'Deleting cluster'
+    cleanup_app
+}
+
+function cleanup_app() {
+
+    # We may have code shared by build templates and app templates
+    # that calls cleanup_app, and the build tempaltes may not have dcs ...
+    set +e
+    oc scale dc/"$APP_NAME" --replicas=0
+    set -e
+    os::cmd::try_until_text 'oc get pods -l deploymentconfig="$APP_NAME"' 'No resources found' $((5*minute))
+    set +e
+    oc delete dc/"$APP_NAME"
+    os::cmd::try_until_failure 'oc logs dc/$APP_NAME' $((5*minute))
+    set -e
+}
+
+function cleanup_cluster() {
+    # We get tricky here and just use try_until_failure for components that
+    # might not actually exist, depending on what we've been doing
+    # If present, they'll be deleted and the next call will fail
+    os::cmd::try_until_failure 'oc delete service "$GEN_CLUSTER_NAME"-ui' $((5*minute))
+    os::cmd::try_until_failure 'oc delete service "$GEN_CLUSTER_NAME"' $((5*minute))
+    os::cmd::try_until_failure 'oc delete dc "$MASTER_DC"' $((5*minute))
+    os::cmd::try_until_failure 'oc delete dc "$WORKER_DC"' $((5*minute))
+}
+
+function get_templates() {
+    set +e
+    if [ "$S2I_TEST_STABLE" != true ]; then
+        echo Using https://radanalytics.io/resources.yaml modified for $S2I_TEST_OSHINKO_VERSION
+
+        wget https://radanalytics.io/resources.yaml -qO - \
+        | sed -r -e "s@(radanalyticsio/radanalytics.*spark)(:stable)@\1:$S2I_TEST_OSHINKO_VERSION@" \
+        | sed -r -e "s@(radanalyticsio/oshinko-webui)(:stable)@\1:$S2I_TEST_OSHINKO_VERSION@" \
+        | oc create -f -
+    else
+	echo Using https://radanalytics.io/resources.yaml \(no modifications\)
+	oc create -f https://radanalytics.io/resources.yaml
+    fi
+    set -e
+ }
