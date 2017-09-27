@@ -80,6 +80,28 @@ function run_app() {
     oc new-app --template=$TEMPLATE $SOURCE_INFO -p APPLICATION_NAME=$APP_NAME -p OSHINKO_DEL_CLUSTER=$DEL_CLUSTER -p OSHINKO_CLUSTER_NAME=$GEN_CLUSTER_NAME $APP_MAIN_CLASS
 }
 
+function get_app_pod() {
+    local count
+    count=0
+
+    set +e
+    while true; do
+        POD=$(oc get pod -l deploymentconfig=$APP_NAME --template='{{index .items 0 "metadata" "name"}}')
+        if [ "$?" -eq 0 ]; then
+            break
+        fi
+        echo Getting pod for $APP_NAME failed, trying again
+        oc get pods
+        sleep 1
+        count=$((count + 1))
+        echo $count
+        if [ "$count" -eq 120 ]; then
+            return 1
+        fi
+    done
+    set -e
+}
+
 function test_versions {
     set_defaults
     local image=$1
@@ -96,6 +118,16 @@ function test_versions {
     os::cmd::try_until_text    'oc log dc/$APP_NAME' 'Job.*finished'
     os::cmd::try_until_text    'oc log dc/$APP_NAME' 'Deleting cluster'
     cleanup_app
+}
+
+function test_webui() {
+    APP_NAME=oshinko
+    oc new-app oshinko-webui
+    get_app_pod
+    os::cmd::try_until_success 'oc exec "$POD" -- /usr/src/app/oshinko version | grep "$S2I_TEST_OSHINKO_VERSION"' $((5*minute))
+    os::cmd::try_until_success 'oc exec "$POD" -- /usr/src/app/oshinko version | grep Default\ spark\ image:\ "$S2I_TEST_SPARK_IMAGE"' $((5*minute))
+    os::cmd::expect_success 'oc get pod $POD --template="{{index .spec \"containers\" 0 \"image\"}}" | grep radanalyticsio/oshinko-webui:"$S2I_TEST_OSHINKO_VERSION"'
+    oc delete dc oshinko
 }
 
 function cleanup_app() {

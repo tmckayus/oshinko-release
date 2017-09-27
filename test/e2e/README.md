@@ -31,9 +31,37 @@ by `run.sh` when it looks for test scripts.
 
 The `test/e2e/common` file reads or sets several environment variables:
 
-``S2I_TEST_WORKERS`` (default is 1)
+``S2I_TEST_STABLE`` (default is false)
 
-  Number of workers in generated clusters
+  If this value is true, resources.yaml is used unmodified and therefore
+  pulls images from docker.io tagged as *stable*. If false, resources.yaml
+  is modified to pull images tagged with ``S2I_TEST_OSHINKO_VERSION``.
+
+``S2I_TEST_OSHINKO_VERSION`` (required)
+
+  The release version that is being tested. The tests compare this value to
+  the versions reported in logs; it is also used in a modified resources.yaml
+  to specify images when ``S2I_TEST_STABLE`` is not true.
+
+``S2I_TEST_IMAGE_PYSPARK`` (default radanalytics-pyspark)
+
+  The tests verify that the s2i builder pulls this image from docker.io
+  when building the pyspark app.
+
+``S2I_TEST_IMAGE_JAVA`` (default radanalytics-java-spark)
+
+  The tests verify that the s2i builder pulls this image from docker.io
+  when building the java spark app.
+
+``S2I_TEST_IMAGE_SCALA`` (default radanalytics-scala-spark)
+
+  The tests verify that the s2i builder pulls this image from docker.io
+  when building the scala spark app.
+
+``S2I_TEST_SPARK_IMAGE`` (defaulted to current expected spark image)
+
+  The tests verify that the default spark cluster image reported in
+  the logs matches this value.
 
 ``S2I_SAVE_FAIL`` (default is false)
 
@@ -51,7 +79,7 @@ The `test/e2e/common` file reads or sets several environment variables:
 The `test-release` make target can be run from the `oshinko-release` root directory.
 
 ```
-$ make test-release
+$ S2I_TEST_OSHINKO_VERSION=v0.3.0 make test-release
 ```
 
 ## Running Tests with run.sh
@@ -60,17 +88,17 @@ Tests may be run using `run.sh` instead
 
 To run the full test suite, use:
 ```sh
-$ test/e2e/run.sh
+$ S2I_TEST_OSHINKO_VERSION=v0.3.0 test/e2e/run.sh
 ```
 
 To run a single test suite, use:
 ```sh
-$ test/e2e/run.sh <name>
+$ S2I_TEST_OSHINKO_VERSION=v0.3.0 test/e2e/run.sh <name>
 ```
 
 To run a set of suites matching some regex, use:
 ```sh
-$ test/e2e/run.sh <regex>
+$ S2I_TEST_OSHINKO_VERSION=v0.3.0 test/e2e/run.sh <regex>
 ```
 
 Any test can also be run in the current project by invoking it directly. Note, this assumes
@@ -78,7 +106,7 @@ that the oshinko serviceaccount has been created and given edit privileges in th
 project.  For example:
 
 ```sh
-$ test/e2e/release/mytest.sh
+$ test/e2e/templates/pyspark/radio_pysparkbuilddc.sh
 ```
 
 ## Adding Tests
