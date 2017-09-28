@@ -124,9 +124,13 @@ function test_webui() {
     APP_NAME=oshinko
     oc new-app oshinko-webui
     get_app_pod
-    os::cmd::try_until_success 'oc exec "$POD" -- /usr/src/app/oshinko version | grep "$S2I_TEST_OSHINKO_VERSION"' $((5*minute))
-    os::cmd::try_until_success 'oc exec "$POD" -- /usr/src/app/oshinko version | grep Default\ spark\ image:\ "$S2I_TEST_SPARK_IMAGE"' $((5*minute))
-    os::cmd::expect_success 'oc get pod $POD --template="{{index .spec \"containers\" 0 \"image\"}}" | grep radanalyticsio/oshinko-webui:"$S2I_TEST_OSHINKO_VERSION"'
+    os::cmd::try_until_success 'oc exec "$POD" -- /usr/src/app/oshinko version | grep "$S2I_TEST_OSHINKO_VERSION"' $((10*minute))
+    os::cmd::try_until_success 'oc exec "$POD" -- /usr/src/app/oshinko version | grep Default\ spark\ image:\ "$S2I_TEST_SPARK_IMAGE"'
+    if [ "$S2I_TEST_STABLE" == true ]; then
+        os::cmd::expect_success 'oc get pod $POD --template="{{index .spec \"containers\" 0 \"image\"}}" | grep radanalyticsio/oshinko-webui:stable'
+    else
+        os::cmd::expect_success 'oc get pod $POD --template="{{index .spec \"containers\" 0 \"image\"}}" | grep radanalyticsio/oshinko-webui:"$S2I_TEST_OSHINKO_VERSION"'
+    fi
     oc delete dc oshinko
 }
 
