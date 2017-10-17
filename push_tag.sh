@@ -6,6 +6,7 @@ function push_tag() {
     docker push docker.io/radanalyticsio/radanalytics-scala-spark:$1 || return 1
     docker push docker.io/radanalyticsio/oshinko-rest:$1 || return 1
     docker push docker.io/radanalyticsio/oshinko-webui:$1 || return 1
+    docker push docker.io/radanalyticsio/oc-proxy:$1 || return 1
 }
 
 if [ "$#" -ne 1 ]; then

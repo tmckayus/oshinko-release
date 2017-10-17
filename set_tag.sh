@@ -12,12 +12,14 @@ function pull_and_tag() {
     docker pull docker.io/radanalyticsio/radanalytics-scala-spark:$1 || return 1
     docker pull docker.io/radanalyticsio/oshinko-rest:$1 || return 1
     docker pull docker.io/radanalyticsio/oshinko-webui:$1 || return 1
+    docker pull docker.io/radanalyticsio/oc-proxy:$1 || return 1
 
     docker tag docker.io/radanalyticsio/radanalytics-pyspark:$1 docker.io/radanalyticsio/radanalytics-pyspark:$2 || return 1
     docker tag docker.io/radanalyticsio/radanalytics-java-spark:$1 docker.io/radanalyticsio/radanalytics-java-spark:$2 || return 1
     docker tag docker.io/radanalyticsio/radanalytics-scala-spark:$1 docker.io/radanalyticsio/radanalytics-scala-spark:$2 || return 1
     docker tag docker.io/radanalyticsio/oshinko-rest:$1 docker.io/radanalyticsio/oshinko-rest:$2 || return 1
     docker tag docker.io/radanalyticsio/oshinko-webui:$1 docker.io/radanalyticsio/oshinko-webui:$2 || return 1
+    docker tag docker.io/radanalyticsio/oc-proxy:$1 docker.io/radanalyticsio/oc-proxy:$2 || return 1
 }
 
 pull_and_tag $1 $2
