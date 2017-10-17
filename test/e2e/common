@@ -5,6 +5,7 @@ S2I_TEST_IMAGE_JAVA=${S2I_TEST_IMAGE_JAVA:-radanalytics-java-spark}
 S2I_TEST_IMAGE_SCALA=${S2I_TEST_IMAGE_SCALA:-radanalytics-scala-spark}
 S2I_TEST_SPARK_IMAGE=${S2I_TEST_SPARK_IMAGE:-radanalyticsio/openshift-spark:2.2-latest}
 S2I_TEST_STABLE=${S2I_TEST_STABLE:-false}
+S2I_TEST_RESOURCES_URL=${S2I_TEST_RESOURCES_URL:-https://radanalytics.io/resources.yaml}
 
 if [ -z $S2I_TEST_OSHINKO_VERSION ]; then
     echo "******* You must set S2I_TEST_OSHINKO_VERSION to the version you are testing for *******"
@@ -124,8 +125,7 @@ function test_webui() {
     APP_NAME=oshinko
     oc new-app oshinko-webui
     get_app_pod
-    os::cmd::try_until_success 'oc exec "$POD" -- /usr/src/app/oshinko version | grep "$S2I_TEST_OSHINKO_VERSION"' $((10*minute))
-    os::cmd::try_until_success 'oc exec "$POD" -- /usr/src/app/oshinko version | grep Default\ spark\ image:\ "$S2I_TEST_SPARK_IMAGE"'
+    os::cmd::try_until_success 'oc log "$POD" | grep Spark\ default\ image\ if\ not\ overridden\ is\ "$S2I_TEST_SPARK_IMAGE"'
     if [ "$S2I_TEST_STABLE" == true ]; then
         os::cmd::expect_success 'oc get pod $POD --template="{{index .spec \"containers\" 0 \"image\"}}" | grep radanalyticsio/oshinko-webui:stable'
     else
@@ -163,13 +163,11 @@ function get_templates() {
     if [ "$S2I_TEST_STABLE" != true ]; then
         echo Using https://radanalytics.io/resources.yaml modified for $S2I_TEST_OSHINKO_VERSION
 
-        wget https://radanalytics.io/resources.yaml -qO - \
-        | sed -r -e "s@(radanalyticsio/radanalytics.*spark)(:stable)@\1:$S2I_TEST_OSHINKO_VERSION@" \
-        | sed -r -e "s@(radanalyticsio/oshinko-webui)(:stable)@\1:$S2I_TEST_OSHINKO_VERSION@" \
-        | oc create -f -
+	wget $S2I_TEST_RESOURCES_URL -qO - \
+	    | sed -r -e "s@(radanalyticsio/.*:)(stable)@\1$S2I_TEST_OSHINKO_VERSION@" | oc create -f -
     else
 	echo Using https://radanalytics.io/resources.yaml \(no modifications\)
-	oc create -f https://radanalytics.io/resources.yaml
+	oc create -f $S2I_TEST_RESOURCES_URL
     fi
     set -e
  }
