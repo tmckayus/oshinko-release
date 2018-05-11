@@ -3,9 +3,10 @@
 S2I_TEST_IMAGE_PYSPARK=${S2I_TEST_IMAGE_PYSPARK:-radanalytics-pyspark}
 S2I_TEST_IMAGE_JAVA=${S2I_TEST_IMAGE_JAVA:-radanalytics-java-spark}
 S2I_TEST_IMAGE_SCALA=${S2I_TEST_IMAGE_SCALA:-radanalytics-scala-spark}
-S2I_TEST_SPARK_IMAGE=${S2I_TEST_SPARK_IMAGE:-radanalyticsio/openshift-spark:2.2-latest}
+S2I_TEST_SPARK_IMAGE=${S2I_TEST_SPARK_IMAGE:-radanalyticsio/openshift-spark:2.3-latest}
 S2I_TEST_STABLE=${S2I_TEST_STABLE:-false}
 S2I_TEST_RESOURCES_URL=${S2I_TEST_RESOURCES_URL:-https://radanalytics.io/resources.yaml}
+
 
 if [ -z $S2I_TEST_OSHINKO_VERSION ]; then
     echo "******* You must set S2I_TEST_OSHINKO_VERSION to the version you are testing for *******"
@@ -161,7 +162,7 @@ function cleanup_cluster() {
 function get_templates() {
     set +e
     if [ "$S2I_TEST_STABLE" != true ]; then
-        echo Using https://radanalytics.io/resources.yaml modified for $S2I_TEST_OSHINKO_VERSION
+        echo Using $S2I_TEST_RESOURCES_URL modified for $S2I_TEST_OSHINKO_VERSION
 
 	wget $S2I_TEST_RESOURCES_URL -qO - \
 	    | sed -r -e "s@(radanalyticsio/.*:)(stable)@\1$S2I_TEST_OSHINKO_VERSION@" | oc create -f -
