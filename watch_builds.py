@@ -1,3 +1,5 @@
+#!/usr/bin/python2
+
 import argparse
 import re
 import requests
