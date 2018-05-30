@@ -1,16 +1,20 @@
 #!/usr/bin/python2
-import re
-import requests
-import argparse
-from ruamel.yaml import YAML
-import logging as log
+from github import Github, BadCredentialsException, UnknownObjectException
 from cerberus import Validator
 from config_schema import schema
+from ruamel.yaml import YAML
+import os
+import re
+import tempfile
+import requests
+import argparse
+import logging as log
 import json
-from github import Github, BadCredentialsException, UnknownObjectException
 import getpass
 import sys
-from os import path
+import hashlib
+import ntpath
+
 
 API_ENDPOINT = 'https://api.github.com'
 
@@ -90,11 +94,59 @@ def validate_yaml(parser, conf):
 
     assets = conf_dict['assets']
     for asset in assets:
-        if not path.exists(asset['name']):
+        if not os.path.exists(asset['name']):
             raise parser.error('File {} specified for asset with label {} does not exist.'
                                .format(asset['label'], asset['name']))
 
     return is_valid
+
+
+def path_leaf(path):
+    head, tail = ntpath.split(path)
+    return tail or ntpath.basename(head)
+
+
+def sha256_checksum(filename, block_size=65536):
+    sha256 = hashlib.sha256()
+    with open(filename, 'rb') as f:
+        for block in iter(lambda: f.read(block_size), b''):
+            sha256.update(block)
+    return sha256.hexdigest()
+
+
+def create_checksum_text(conf_yaml):
+    checksum_data = ''
+    for asset in conf_yaml['assets']:
+        checksum = sha256_checksum(asset['name'])
+        checksum_data += '{} *{}\n'.format(checksum, path_leaf(asset['name']))
+    return checksum_data
+
+
+# Securely create a temporary checksum asset to uplaod and remove afterwards
+def upload_checksum(data, release):
+    tmpdir = tempfile.mkdtemp()
+    filename = 'SHA256-CHECKSUM'
+
+    # Ensure the file is read/write by the creator only
+    saved_umask = os.umask(0o077)
+
+    path = os.path.join(tmpdir, filename)
+    try:
+        with open(path, "w") as tmp:
+            tmp.write(data)
+            tmp.flush()
+            release.upload_asset(
+                path,
+                filename,
+                'plain'
+            )
+            log.info('Asset {} uploaded successfully.'.format(filename))
+            os.remove(path)
+    except IOError:
+        log.error('IOError')
+    finally:
+        os.umask(saved_umask)
+        os.rmdir(tmpdir)
 
 
 def create_release(conf, repo, user, repo_name):
@@ -105,7 +157,7 @@ def create_release(conf, repo, user, repo_name):
     r = requests.get('{}/repos/{}/{}/releases/tags/{}'.format(API_ENDPOINT, user,
                                                               repo_name, conf_yaml['tag_name']))
     if r.status_code == 200:
-        log.error('Repo already exists.')
+        log.error('Repo release tag already exists.')
         sys.exit(1)
 
     log.info('Creating a git release with tag {}.'.format(conf_yaml['tag_name']))
@@ -114,6 +166,7 @@ def create_release(conf, repo, user, repo_name):
                             conf_yaml['target_commitish'])
 
     release = repo.get_release(conf_yaml['tag_name'])
+    checksum_data = create_checksum_text(conf_yaml)
 
     log.info('Uploading assets...')
     for asset in conf_yaml['assets']:
@@ -123,6 +176,8 @@ def create_release(conf, repo, user, repo_name):
             asset['Content-Type']
         )
         log.info('Asset {} uploaded successfully.'.format(asset['label']))
+    upload_checksum(checksum_data, release)
+
     log.info('Release successfully created.')
 
 
