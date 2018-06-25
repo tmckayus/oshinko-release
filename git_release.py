@@ -11,9 +11,9 @@ import argparse
 import logging as log
 import json
 import getpass
-import sys
 import hashlib
 import ntpath
+import magic
 
 
 API_ENDPOINT = 'https://api.github.com'
@@ -35,14 +35,20 @@ def get_opts():
                         help='a git hub auth token. Skips user input for authentication if '
                              'provided.')
 
+    parser.add_argument('-u', dest='gh_user', type=str, default=None, nargs=1,
+                        help='if the user creating the release is different than the repo owner, '
+                             'specify their github username here, note that any token provided '
+                             'should be assigned to this username.')
+
     parser.add_argument('-t', dest='deletetag', help='Delete tag with release, [-d] must be '
-                                   'specified.', action='store_true')
+                                                     'specified.', action='store_true')
 
     args = parser.parse_args()
     token = args.token[0] if args.token else None
     conf = args.config[0] if args.config else None
     tag = args.tag[0] if args.tag else None
     delete_tag = args.deletetag
+    gh_user = args.gh_user[0]
 
     if delete_tag and not tag:
         parser.error('[-t] requires a release tag to be specified via [-d].')
@@ -58,9 +64,9 @@ def get_opts():
 
     validate_repo(parser, repo)
 
-    user, repo_name = repo.split('/')
+    owner, repo_name = repo.split('/')
 
-    return user, repo_name, conf, token, tag, delete_tag
+    return owner, repo_name, conf, token, tag, delete_tag, gh_user
 
 
 def validate_repo(parser, repo):
@@ -92,11 +98,12 @@ def validate_yaml(parser, conf):
     if not is_valid:
         raise parser.error('Invalid file format in file {}\nError: {}'.format(conf, v.errors))
 
-    assets = conf_dict['assets']
-    for asset in assets:
-        if not os.path.exists(asset['name']):
-            raise parser.error('File {} specified for asset with label {} does not exist.'
-                               .format(asset['label'], asset['name']))
+    if 'assets' in conf_dict:
+        assets = conf_dict['assets']
+        for asset in assets:
+            if not os.path.exists(asset['name']):
+                raise parser.error('File {} specified for asset with label {} does not exist.'
+                                   .format(asset['label'], asset['name']))
 
     return is_valid
 
@@ -114,21 +121,24 @@ def sha256_checksum(filename, block_size=65536):
     return sha256.hexdigest()
 
 
-def create_checksum_text(conf_yaml):
+def create_checksum_text(assets):
     checksum_data = ''
-    for asset in conf_yaml['assets']:
+    for asset in assets:
         checksum = sha256_checksum(asset['name'])
         checksum_data += '{} *{}\n'.format(checksum, path_leaf(asset['name']))
     return checksum_data
 
 
 # Securely create a temporary checksum asset to uplaod and remove afterwards
-def upload_checksum(data, release):
-    tmpdir = tempfile.mkdtemp()
+def upload_checksum(data, release, tmpdir):
     filename = 'SHA256-CHECKSUM'
-
-    # Ensure the file is read/write by the creator only
-    saved_umask = os.umask(0o077)
+    created_new_dir = False
+    saved_umask = None
+    if not tmpdir:
+        tmpdir = tempfile.mkdtemp()
+        # Ensure the file is read/write by the creator only
+        saved_umask = os.umask(0o077)
+        created_new_dir = True
 
     path = os.path.join(tmpdir, filename)
     try:
@@ -143,42 +153,38 @@ def upload_checksum(data, release):
             log.info('Asset {} uploaded successfully.'.format(filename))
             os.remove(path)
     except IOError:
-        log.error('IOError')
+        log.error('Error while writing CHECKSUM')
+        raise IOError('Error while writing CHECKSUM')
     finally:
-        os.umask(saved_umask)
-        os.rmdir(tmpdir)
+        if created_new_dir:
+            os.umask(saved_umask)
+            os.rmdir(tmpdir)
 
 
-def create_release(conf, repo, user, repo_name):
-    yaml = YAML()
-    with open(conf, 'r') as config:
-        conf_yaml = yaml.load(config)
+# TODO: Add verification release was uploaded successfully
+def create_release(repo, tag_name, name, body, draft, prerelease,
+                   target_commitish, assets=None, tmpdir=''):
+    if assets is None:
+        assets = []
 
-    r = requests.get('{}/repos/{}/{}/releases/tags/{}'.format(API_ENDPOINT, user,
-                                                              repo_name, conf_yaml['tag_name']))
-    if r.status_code == 200:
-        log.error('Repo release tag already exists.')
-        sys.exit(1)
+    log.info('Creating a git release with tag {}.'.format(tag_name))
+    repo.create_git_release(tag_name, name, body, draft, prerelease, target_commitish)
 
-    log.info('Creating a git release with tag {}.'.format(conf_yaml['tag_name']))
-    repo.create_git_release(conf_yaml['tag_name'], conf_yaml['name'], conf_yaml['body'],
-                            conf_yaml['draft'], conf_yaml['prerelease'],
-                            conf_yaml['target_commitish'])
+    if assets:
+        release = repo.get_release(tag_name)
+        checksum_data = create_checksum_text(assets)
 
-    release = repo.get_release(conf_yaml['tag_name'])
-    checksum_data = create_checksum_text(conf_yaml)
+        log.info('Uploading assets...')
+        for asset in assets:
+            release.upload_asset(
+                asset['name'],
+                asset['label'],
+                asset['Content-Type']
+            )
+            log.info('Asset {} uploaded successfully.'.format(asset['label']))
+        upload_checksum(checksum_data, release, tmpdir)
 
-    log.info('Uploading assets...')
-    for asset in conf_yaml['assets']:
-        release.upload_asset(
-            asset['name'],
-            asset['label'],
-            asset['Content-Type']
-        )
-        log.info('Asset {} uploaded successfully.'.format(asset['label']))
-    upload_checksum(checksum_data, release)
-
-    log.info('Release successfully created.')
+        log.info('Release successfully created.')
 
 
 def delete_release(tag, delete_tag, repo):
@@ -189,33 +195,60 @@ def delete_release(tag, delete_tag, repo):
         release.delete_release()
     except UnknownObjectException:
         log.error('Release with tag {} was not found.'.format(tag))
-        sys.exit(1)
+        raise UnknownObjectException
 
     if delete_tag:
         log.info('Deleting a git tag {}.'.format(tag))
         repo.get_git_ref(ref='tags/'+tag).delete()
 
 
-def main():
-    user, repo_name, conf, token, tag, delete_tag = get_opts()
-
+# Specify owner if owner != logged in user
+def get_repo(user, repo_name, token, owner=None):
     if token:
         github = Github(user, token)
     else:
         github = Github(user, getpass.getpass())
 
     try:
-        repo = github.get_user(user).get_repo(repo_name)
+        if owner is None:
+            repo = github.get_user(user).get_repo(repo_name)
+        else:
+            repo = github.get_user(owner).get_repo(repo_name)
     except BadCredentialsException:
-        log.error('Bad credentials. Ensure a valid user and password/token are provided.')
-        sys.exit(1)
+        error_msg = 'Bad Github credentials. Ensure a valid user and password/token are provided.'
+        log.error(error_msg)
+        raise BadCredentialsException
+
+    return repo
+
+
+def main():
+    owner, repo_name, conf, token, tag, delete_tag, gh_user = get_opts()
+
+    # If a separate gh_user is not provided, owner is assumed as the user performing release
+    if gh_user is None:
+        gh_user = owner
+
+    repo = get_repo(gh_user, repo_name, token, owner)
 
     if conf:
-        create_release(conf, repo, user, repo_name)
+        yaml = YAML()
+        with open(conf, 'r') as config:
+            conf_yaml = yaml.load(config)
+
+        tag_name, name, body, draft, prerelease, target_commitish = \
+            conf_yaml['tag_name'], conf_yaml['name'], conf_yaml['body'], \
+            conf_yaml['draft'], conf_yaml['prerelease'], \
+            conf_yaml['target_commitish']
+
+        assets = conf_yaml['assets'] if 'assets' in conf_yaml else []
+        create_release(repo, tag_name, name, body, draft, prerelease, target_commitish, assets)
     else:
         delete_release(tag, delete_tag, repo)
 
     return 0
 
 
-main()
+if __name__ == "__main__":
+    main()
+

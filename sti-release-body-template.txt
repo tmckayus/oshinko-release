@@ -1,0 +1,15 @@
+# Oshinko S2I images used by these templates
+These templates use the following oshinko s2i images:
+
+- radanalyticsio/radanalytics-pyspark:v<<<OSHINKO_VERSION>>> found <<<PYSPARK_LINK>>>
+- radanalyticsio/radanalytics-java-spark:v<<<OSHINKO_VERSION>>> found <<<JAVA_SPARK_LINK>>>
+- radanalyticsio/radanalytics-scala-spark:v<<<OSHINKO_VERSION>>> found <<<SCALA_SPARK_LINK>>>
+
+# Apache Spark version
+The referenced oshinko s2i images use Apache Spark <<<SPARK_VERSION>>>
+
+# Oshinko binary version
+The referenced oshinko s2i images use oshinko binary release v<<<OSHINKO_VERSION>>> found <<<CLI_LINK>>>
+
+# Summary of changes in templates
+<<<RELEASE_NOTES_BODY>>>
