@@ -5,7 +5,7 @@ source $TEST_DIR/common
 
 set_template oshinko-java-spark-build-dc
 set_git_uri https://github.com/radanalyticsio/s2i-integration-test-apps
-set_app_main_class org.apache.spark.examples.JavaSparkPi
+set_app_main_class com.mycompany.app.JavaSparkPi
 get_templates
 
 os::test::junit::declare_suite_start "$MY_SCRIPT"
