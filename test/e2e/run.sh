@@ -1,8 +1,18 @@
 #!/bin/bash
 STARTTIME=$(date +%s)
 
+if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Mac OSX
+	    result=:$(brew ls coreutils)
+        if [ -z "$result" ]; then
+          'Error: coreutils is not installed.'
+          exit 1
+        fi
+        TEST_DIR=$(greadlink -f `dirname "${BASH_SOURCE[0]}"` | grep -o '.*/oshinko-release/test/e2e')
+else
+        TEST_DIR=$(readlink -f `dirname "${BASH_SOURCE[0]}"` | grep -o '.*/oshinko-release/test/e2e')
+fi
 # Sourcing common will source hack/lib/init.sh
-TEST_DIR=$(readlink -f `dirname "${BASH_SOURCE[0]}"` | grep -o '.*/oshinko-release/test/e2e')
 source $TEST_DIR/common
 print_test_env
 
@@ -34,7 +44,7 @@ function find_tests() {
     full_test_list=($(find "${1}" -maxdepth 1 -name '*.sh'))
     if [ "${#full_test_list[@]}" -eq 0 ]; then
         return 0
-    fi    
+    fi
     for test in "${full_test_list[@]}"; do
     	test_rel_path=${test#${test::1}*oshinko-release/test/e2e/}
         if grep -q -E "${test_regex}" <<< "${test_rel_path}"; then
