@@ -7,7 +7,9 @@
 * dh_trigger_token_openshift_spark
 * dh_trigger_token_sti_scala
 * dh_trigger_token_sti_pysprk
+* dh_trigger_token_sti_pysprk_36
 * dh_trigger_token_sti_java
+* dh_trigger_token_sti_rspark
 * dh_trigger_token_oc_proxy
 * dh_trigger_token_oshinko_webui
 * dh_trigger_token_oshinko_cli
@@ -109,8 +111,8 @@ private void validateParameters(Map<String, String> ghRepos, Map<String, String>
     }
 
     String[] dhProjects = ['openshift-spark', 'oshinko-cli', 'oshinko-webui',
-                           'oc-proxy', 'oshinko-s2i-scala',
-                           'oshinko-s2i-pyspark', 'oshinko-s2i-java']
+                           'oc-proxy', 'oshinko-s2i-scala', 'oshinko-s2i-pyspark',
+                           'oshinko-s2i-java', 'oshinko-s2i-pyspark-36', 'oshinko-s2i-r-spark']
 
     for(String project in dhProjects){
         if(!dhRepos.containsKey(project)){
@@ -357,6 +359,16 @@ node {
                                     withEnv(["DH_REPO=${DH_REPOS.get("oshinko-s2i-scala")}"]) {
                                         watchAutoBuildStage(sourceTag, 'dh_trigger_token_sti_scala')
                                     }
+                                },
+                                'py-spark-36': {
+                                    withEnv(["DH_REPO=${DH_REPOS.get("oshinko-s2i-pyspark-36")}"]) {
+                                        watchAutoBuildStage(sourceTag, 'dh_trigger_token_sti_pysprk_36')
+                                    }
+                                },
+                                'r-spark': {
+                                    withEnv(["DH_REPO=${DH_REPOS.get("oshinko-s2i-r-spark")}"]) {
+                                        watchAutoBuildStage(sourceTag, 'dh_trigger_token_sti_rspark')
+                                    }
                                 }
                         )
                     }
@@ -378,15 +390,24 @@ node {
                             String dhRepoScala = DH_REPOS.get("oshinko-s2i-scala")
                             String dhRepoPyspark = DH_REPOS.get("oshinko-s2i-pyspark")
                             String dhRepoJava = DH_REPOS.get("oshinko-s2i-java")
+                            String dhRepoPyspark36 = DH_REPOS.get("oshinko-s2i-pyspark-36")
+                            String dhRepoRSpark = DH_REPOS.get("oshinko-s2i-r-spark")
+
 
                             String scalaLn = "${DOCKERHUB_ENDPOINT}/${DH_REPO_OWNER}/${dhRepoScala}" as String
                             String pysparkLn = "${DOCKERHUB_ENDPOINT}/${DH_REPO_OWNER}/${dhRepoPyspark}"  as String
                             String javaLn = "${DOCKERHUB_ENDPOINT}/${DH_REPO_OWNER}/${dhRepoJava}"  as String
+                            String pyspark36ln = "${DOCKERHUB_ENDPOINT}/${DH_REPO_OWNER}/${dhRepoPyspark36}"  as String
+                            String rsparkLn = "${DOCKERHUB_ENDPOINT}/${DH_REPO_OWNER}/${dhRepoRSpark}"  as String
+
                             String oshinkoCliLn = "${GITHUB_ENDPOINT}/${GH_REPO_OWNER}/${cliRepo}/releases/tag/v${OSHINKO_VERSION}"  as String
 
                             template = template.replace("<<<SCALA_SPARK_LINK>>>", "[here](${scalaLn})")
                             template = template.replace("<<<PYSPARK_LINK>>>", "[here](${pysparkLn})")
                             template = template.replace("<<<JAVA_SPARK_LINK>>>", "[here](${javaLn})")
+                            template = template.replace("<<<PYSPARK_PY36_LINK>>>", "[here](${pyspark36ln})")
+                            template = template.replace("<<<R_SPARK_LINK>>>", "[here](${rsparkLn})")
+
                             template = template.replace("<<<CLI_LINK>>>", "[here](${oshinkoCliLn})")
                             template = template.replace('<<<OSHINKO_VERSION>>>', OSHINKO_VERSION)
                             template = template.replace('<<<SPARK_VERSION>>>', SPARK_VERSION)

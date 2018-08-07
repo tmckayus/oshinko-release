@@ -2,8 +2,10 @@
 These templates use the following oshinko s2i images:
 
 - radanalyticsio/radanalytics-pyspark:v<<<OSHINKO_VERSION>>> found <<<PYSPARK_LINK>>>
+- radanalyticsio/radanalytics-pyspark-py36:v<<<OSHINKO_VERSION>>> found <<<PYSPARK_PY36_LINK>>>
 - radanalyticsio/radanalytics-java-spark:v<<<OSHINKO_VERSION>>> found <<<JAVA_SPARK_LINK>>>
 - radanalyticsio/radanalytics-scala-spark:v<<<OSHINKO_VERSION>>> found <<<SCALA_SPARK_LINK>>>
+- radanalyticsio/radanalytics-r-spark:v<<<OSHINKO_VERSION>>> found <<<R_SPARK_LINK>>>
 
 # Apache Spark version
 The referenced oshinko s2i images use Apache Spark <<<SPARK_VERSION>>>
