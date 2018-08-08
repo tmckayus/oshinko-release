@@ -3,7 +3,7 @@ STARTTIME=$(date +%s)
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
    # Mac OSX
-	 result=:$(brew ls coreutils)
+   result=:$(brew ls coreutils)
    if [ -z "$result" ]; then
       'Error: coreutils is not installed.'
       exit 1
