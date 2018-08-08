@@ -2,15 +2,15 @@
 STARTTIME=$(date +%s)
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
-        # Mac OSX
-	    result=:$(brew ls coreutils)
-        if [ -z "$result" ]; then
-          'Error: coreutils is not installed.'
-          exit 1
-        fi
-        TEST_DIR=$(greadlink -f `dirname "${BASH_SOURCE[0]}"` | grep -o '.*/oshinko-release/test/e2e')
-else
-        TEST_DIR=$(readlink -f `dirname "${BASH_SOURCE[0]}"` | grep -o '.*/oshinko-release/test/e2e')
+   # Mac OSX
+	 result=:$(brew ls coreutils)
+   if [ -z "$result" ]; then
+      'Error: coreutils is not installed.'
+      exit 1
+   fi
+      TEST_DIR=$(greadlink -f `dirname "${BASH_SOURCE[0]}"` | grep -o '.*/oshinko-release/test/e2e')
+   else
+      TEST_DIR=$(readlink -f `dirname "${BASH_SOURCE[0]}"` | grep -o '.*/oshinko-release/test/e2e')
 fi
 # Sourcing common will source hack/lib/init.sh
 source $TEST_DIR/common
