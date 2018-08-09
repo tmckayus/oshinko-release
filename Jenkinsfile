@@ -165,9 +165,9 @@ int WATCH_INTERVAL_DEFAULT = params.repoWatchInterval
 int WATCH_RETRY_COUNT_DEFAULT = params.watchRetryCount
 
 node {
-    withCredentials([string(credentialsId: 'github-automation-user', variable: 'GH_USER'),
-                     string(credentialsId: 'github-automation-email', variable: 'GH_USER_EMAIL'),
-                     string(credentialsId: 'github-user-auth-token', variable: 'GH_AUTH_TOKEN')]) {
+    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'radly-qe-github',
+                      usernameVariable: 'GH_USER', passwordVariable: 'GH_AUTH_TOKEN'],
+                     string(credentialsId: 'github-automation-email', variable: 'GH_USER_EMAIL')]) {
 
         withEnv(["REPO_CTRL=${REPO_CTRL}", "DH_REPO_OWNER=${DH_REPO_OWNER}",
                  "GH_REPO_OWNER=${GH_REPO_OWNER}", "GH_RELEASE_DIR=${GH_RELEASE_DIR}",
