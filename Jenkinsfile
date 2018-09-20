@@ -231,7 +231,7 @@ withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'radly-
                     tmpdir = tmpdir.trim()
 
                     try {
-                        build job: cliJob, propagate: true, wait: true
+                        build job: cliJob, parameters:  [string(name: 'VERSION', value: "v${OSHINKO_VERSION}")], propagate: true, wait: true
                         copyArtifacts(projectName: cliJob, target: tmpdir)
                         String artifactsDir = "${tmpdir}/src/github.com/${GH_REPO_OWNER}/${GH_REPO}/bin" as String
 
