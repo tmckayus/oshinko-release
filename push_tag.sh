@@ -2,8 +2,13 @@
 set -e
 function push_tag() {
     docker push docker.io/radanalyticsio/radanalytics-pyspark:$1 || return 1
+    docker push docker.io/radanalyticsio/radanalytics-pyspark-py36:$1 || return 1
     docker push docker.io/radanalyticsio/radanalytics-java-spark:$1 || return 1
     docker push docker.io/radanalyticsio/radanalytics-scala-spark:$1 || return 1
+    docker push docker.io/radanalyticsio/radanalytics-pyspark-inc:$1 || return 1
+    docker push docker.io/radanalyticsio/radanalytics-pyspark-py36-inc:$1 || return 1
+    docker push docker.io/radanalyticsio/radanalytics-java-spark-inc:$1 || return 1
+    docker push docker.io/radanalyticsio/radanalytics-scala-spark-inc:$1 || return 1
     docker push docker.io/radanalyticsio/oshinko-rest:$1 || return 1
     docker push docker.io/radanalyticsio/oshinko-webui:$1 || return 1
     docker push docker.io/radanalyticsio/oc-proxy:$1 || return 1
